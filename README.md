@@ -23,8 +23,9 @@ git clone <repo-url>
 cd assinatura-usuarios
 
 # Na pasta raiz, podemos subir toda a infraestrutura + microsserviços, com o docker em execução local:
-docker compose -f infra/compose.yaml --project-directory . up --build (utilizei o --project-directory para rodar o compose que está dentro de infra, por organização do git)
-ou, se o compose.yaml for movido para a pasta raiz: docker compose up --build
+docker compose -f infra/compose.yaml --project-directory . up --build # (utilizei o --project-directory para rodar o compose que está dentro de infra, por organização do git)
+# ou, se o compose.yaml for movido para a pasta raiz:
+docker compose up --build
 
 # Somente a infraestrutura (para desenvolvimento local)
 docker compose up postgres redis kafka zookeeper kafka-ui zipkin prometheus grafana -d
