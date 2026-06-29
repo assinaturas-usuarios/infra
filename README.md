@@ -18,12 +18,13 @@ Sistema de gestão de assinaturas composto por três microsserviços que se comu
 ## Subindo tudo com Docker
 
 ```bash
-# Clonar e entrar na pasta
+# Clonar os microsserviços, e o repo de infra numa pasta raiz:
 git clone <repo-url>
 cd assinatura-usuarios
 
-# Subir toda a infraestrutura + microsserviços, com o docker em execução local:
-docker compose up --build
+# Na pasta raiz, podemos subir toda a infraestrutura + microsserviços, com o docker em execução local:
+docker compose -f infra/compose.yaml --project-directory . up --build (utilizei o --project-directory para rodar o compose que está dentro de infra, por organização do git)
+ou, se o compose.yaml for movido para a pasta raiz: docker compose up --build
 
 # Somente a infraestrutura (para desenvolvimento local)
 docker compose up postgres redis kafka zookeeper kafka-ui zipkin prometheus grafana -d
@@ -114,7 +115,7 @@ docker compose down -v
 ## Testes
 
 ```bash
-# Em cada microsserviço
+# Em cada microsserviço, ex:
 cd ms-assinatura
 ./mvnw test                # roda testes
 ./mvnw verify              # testes + cobertura JaCoCo (mínimo 90%)
