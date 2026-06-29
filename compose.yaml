@@ -1,0 +1,267 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: assinaturas-postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Admin123@
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - assinaturas-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: assinaturas-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - assinaturas-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: assinaturas-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc localhost 2181 | grep Mode"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - assinaturas-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: assinaturas-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - assinaturas-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: assinaturas-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - assinaturas-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: assinaturas-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    networks:
+      - assinaturas-net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: assinaturas-kibana
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks:
+      - assinaturas-net
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: assinaturas-logstash
+    volumes:
+      - ./infra/logstash/pipeline:/usr/share/logstash/pipeline
+    ports:
+      - "5000:5000"
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - assinaturas-net
+
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: assinaturas-zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - assinaturas-net
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: assinaturas-prometheus
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    depends_on:
+      - ms-assinatura
+      - ms-pagamento
+      - ms-usuario
+    networks:
+      - assinaturas-net
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: assinaturas-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - assinaturas-net
+
+  ms-usuario:
+    build:
+      context: ./ms-usuario
+      dockerfile: Dockerfile
+    container_name: ms-usuario
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://postgres:5432/usuario_db
+      DB_USERNAME: admin
+      DB_PASSWORD: admin123
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+      LOGSTASH_HOST: logstash
+    networks:
+      - assinaturas-net
+
+  ms-assinatura:
+    build:
+      context: ./ms-assinatura
+      dockerfile: Dockerfile
+    container_name: ms-assinatura
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: r2dbc:postgresql://postgres:5432/assinatura_db
+      DB_FLYWAY_URL: jdbc:postgresql://postgres:5432/assinatura_db
+      DB_USERNAME: admin
+      DB_PASSWORD: admin123
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MS_USUARIO_URL: http://ms-usuario:8081
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+      LOGSTASH_HOST: logstash
+    networks:
+      - assinaturas-net
+
+  ms-pagamento:
+    build:
+      context: ./ms-pagamento
+      dockerfile: Dockerfile
+    container_name: ms-pagamento
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://postgres:5432/pagamento_db
+      DB_USERNAME: admin
+      DB_PASSWORD: admin123
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ZIPKIN_URL: http://zipkin:9411/api/v2/spans
+      LOGSTASH_HOST: logstash
+    networks:
+      - assinaturas-net
+
+volumes:
+  postgres_data:
+  elasticsearch_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  assinaturas-net:
+    driver: bridge
+

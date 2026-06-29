@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'ms-assinatura'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['ms-assinatura:8082']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  - job_name: 'ms-pagamento'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['ms-pagamento:8083']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  - job_name: 'ms-usuario'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['ms-usuario:8081']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
