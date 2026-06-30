@@ -156,10 +156,6 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
     ports:
       - "9090:9090"
-    depends_on:
-      - ms-assinatura
-      - ms-pagamento
-      - ms-usuario
     networks:
       - assinaturas-net
 

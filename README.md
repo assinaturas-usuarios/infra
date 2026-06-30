@@ -27,8 +27,8 @@ docker compose -f infra/compose.yaml --project-directory . up --build # (utilize
 # ou, se o compose.yaml for movido para a pasta raiz:
 docker compose up --build
 
-# Somente a infraestrutura (para desenvolvimento local)
-docker compose up postgres redis kafka zookeeper kafka-ui zipkin prometheus grafana -d
+# Somente a infraestrutura (para desenvolvimento local, de dentro de infra/)
+docker compose -f compose.yaml --project-directory .. up postgres redis kafka zookeeper kafka-ui zipkin prometheus grafana -d
 ```
 
 > O `--build` reconstrói as imagens dos microsserviços. Omitir nas próximas execuções para usar o cache.
