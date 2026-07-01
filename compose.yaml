@@ -4,7 +4,7 @@ services:
     container_name: assinaturas-postgres
     environment:
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: Admin123@
+      POSTGRES_PASSWORD: admin123
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init-dbs.sh:/docker-entrypoint-initdb.d/init-dbs.sh
@@ -190,6 +190,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       DB_URL: jdbc:postgresql://postgres:5432/usuario_db
+      DB_FLYWAY_URL: jdbc:postgresql://postgres:5432/usuario_db
       DB_USERNAME: admin
       DB_PASSWORD: admin123
       REDIS_HOST: redis
@@ -243,6 +244,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       DB_URL: jdbc:postgresql://postgres:5432/pagamento_db
+      DB_FLYWAY_URL: jdbc:postgresql://postgres:5432/pagamento_db
       DB_USERNAME: admin
       DB_PASSWORD: admin123
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
