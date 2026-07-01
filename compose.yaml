@@ -175,6 +175,20 @@ services:
     networks:
       - assinaturas-net
 
+  nginx:
+    image: nginx:alpine
+    container_name: assinaturas-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./infra/nginx/cors.conf:/etc/nginx/cors.conf
+    depends_on:
+      - ms-usuario
+      - ms-assinatura
+    networks:
+      - assinaturas-net
+
   ms-usuario:
     build:
       context: ./ms-usuario
